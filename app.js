@@ -1,6 +1,10 @@
 const express = require('express')
 const bodyParser = require('body-parser')
+const mongoose = require('mongoose')
+require('dotenv').config()
+
 const feedRoutes = require('./routes/feed')
+const mongoDbPassword = process.env.MONGO_DB_PASSWORD
 
 const app = express()
 
@@ -19,20 +23,12 @@ app.use((req, res, next) => {
 
 app.use('/feed', feedRoutes)
 
-app.listen(8080)
-
-postButton.addEventListener('click', () => {
-    fetch('http://localhost:8080/feed/posts', {
-        method: 'POST',
-        body: JSON.stringify({
-            title: 'A new post',
-            content: 'Some super cool content',
-        }),
-        headers: {
-            'Content-Type': 'application/json',
-        },
+mongoose
+    .connect(
+        `mongodb+srv://dpisterzi:${mongoDbPassword}@cluster0.wdwpbii.mongodb.net/messages?retryWrites=true&w=majority`
+    )
+    .then((result) => {
+        console.log('Connected to DB')
+        app.listen(8080)
     })
-        .then((res) => res.json())
-        .then((resData) => console.log(resData))
-        .catch((err) => console.log(err))
-})
+    .catch((err) => console.log(err))
