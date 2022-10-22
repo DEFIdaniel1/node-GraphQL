@@ -2,6 +2,7 @@ const express = require('express')
 const bodyParser = require('body-parser')
 const mongoose = require('mongoose')
 require('dotenv').config()
+const path = require('path')
 
 const feedRoutes = require('./routes/feed')
 const mongoDbPassword = process.env.MONGO_DB_PASSWORD
@@ -20,6 +21,9 @@ app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
     next()
 })
+
+//middleware to deal static images folder
+app.use('/images', express.static(path.join(__dirname, 'images')))
 
 app.use('/feed', feedRoutes)
 

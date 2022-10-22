@@ -26,16 +26,17 @@ exports.postPosts = (req, res, next) => {
     const post = new Post({
         title: title,
         content: content,
+        imageUrl: 'images/cat.webp',
         creator: { name: 'Daniel' },
         // mongodb will add new ID and timestamp
     })
-    post.save().then((postResult) => {
-        console.log(postResult)
-        res.status(201)
-            .json({
+    post.save()
+        .then((postResult) => {
+            console.log(postResult)
+            res.status(201).json({
                 message: 'Post created successfully',
                 post: postResult,
             })
-            .catch((err) => console.log(err))
-    })
+        })
+        .catch((err) => console.log(err))
 }
