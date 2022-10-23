@@ -17,6 +17,7 @@ router.post(
 )
 router.get('/post/:postId', feedController.getSinglePost)
 
+//PUT Edit post
 router.put(
     '/post/:postId',
     [
@@ -25,5 +26,8 @@ router.put(
     ],
     feedController.editPost
 )
+
+//DELETE
+router.delete('/post/:postId', feedController.deletePost)
 
 module.exports = router
