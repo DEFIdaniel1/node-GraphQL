@@ -1,16 +1,15 @@
 const path = require('path')
 require('dotenv').config()
+const mongoDbPassword = process.env.MONGO_DB_PASSWORD
 
 const express = require('express')
 const bodyParser = require('body-parser')
 const mongoose = require('mongoose')
 const multer = require('multer')
 
-// const upload = multer({ dest: 'uploads/' })
-const feedRoutes = require('./routes/feed')
-const mongoDbPassword = process.env.MONGO_DB_PASSWORD
-
 const app = express()
+
+// MUTER & Body Parser Setup
 const fileStorage = multer.diskStorage({
     destination: (req, file, cb) => {
         cb(null, 'images')
@@ -30,12 +29,12 @@ const fileFilter = (req, file, cb) => {
         cb(null, false)
     }
 }
-
-app.use(bodyParser.json()) // application/json
+app.use(bodyParser.json())
 app.use(
     multer({ storage: fileStorage, fileFilter: fileFilter }).single('image')
 )
-//middleware for allowing diff server requests (CORS)
+
+//CORS - middleware for allowing diff server requests
 app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader(
@@ -46,10 +45,14 @@ app.use((req, res, next) => {
     next()
 })
 
-//middleware to deal static images folder
+//IMAGES - middleware to deal static images folder
 app.use('/images', express.static(path.join(__dirname, 'images')))
 
+// ROUTES
+const feedRoutes = require('./routes/feed')
+const authRoutes = require('./routes/auth')
 app.use('/feed', feedRoutes)
+app.use('/auth', authRoutes)
 
 // Error handling
 app.use((error, req, res, next) => {
