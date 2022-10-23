@@ -5,11 +5,27 @@ const path = require('path')
 const Post = require('../models/post')
 
 exports.getPosts = (req, res, next) => {
+    const currentPage = req.query.page || 1
+    const perPage = req.query.perPage || 1
+    let totalItems
     Post.find()
+        .countDocuments()
+        .then((documentCount) => {
+            totalItems = documentCount
+            return (
+                // PAGINATION
+                Post.find()
+                    // Skips data before the page we're on
+                    .skip((currentPage - 1) * perPage)
+                    // Limit the data for JUST the page (2 items per page, for example)
+                    .limit(perPage)
+            )
+        })
         .then((posts) => {
             res.status(200).json({
                 message: 'Fetched posts successfully.',
                 posts: posts,
+                totalItems: totalItems,
             })
         })
         .catch((err) => {
