@@ -3,6 +3,7 @@ const fs = require('fs')
 const path = require('path')
 
 const Post = require('../models/post')
+const User = require('../models/user')
 
 exports.getPosts = (req, res, next) => {
     const currentPage = req.query.page || 1
@@ -19,6 +20,7 @@ exports.getPosts = (req, res, next) => {
                     .skip((currentPage - 1) * perPage)
                     // Limit the data for JUST the page (2 items per page, for example)
                     .limit(perPage)
+                    .populate('creator', 'name')
             )
         })
         .then((posts) => {
@@ -55,13 +57,20 @@ exports.createPost = (req, res, next) => {
         title: title,
         content: content,
         imageUrl: imageUrl,
-        creator: { name: 'Daniel' },
+        creator: req.userId,
     })
     post.save()
         .then((result) => {
+            return User.findById(req.userId)
+        })
+        .then((user) => {
+            user.posts.push(post)
+            return user.save()
+        })
+        .then((result) => {
             res.status(201).json({
                 message: 'Post created successfully!',
-                post: result,
+                post: post,
             })
         })
         .catch((err) => {
