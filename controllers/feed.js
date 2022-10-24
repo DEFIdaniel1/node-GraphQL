@@ -1,42 +1,32 @@
 const { validationResult } = require('express-validator')
 const fs = require('fs')
 const path = require('path')
-const post = require('../models/post')
 
 const Post = require('../models/post')
 const User = require('../models/user')
 
-exports.getPosts = (req, res, next) => {
+exports.getPosts = async (req, res, next) => {
     const currentPage = req.query.page || 1
     const perPage = 2
-    let totalItems
-    Post.find()
-        .countDocuments()
-        .then((documentCount) => {
-            totalItems = documentCount
-            return (
-                // PAGINATION
-                Post.find()
-                    // Skips data before the page we're on
-                    .skip((currentPage - 1) * perPage)
-                    // Limit the data for JUST the page (2 items per page, for example)
-                    .limit(perPage)
-                    .populate('creator', 'name')
-            )
+    try {
+        const totalItems = await Post.find().countDocuments()
+        const posts = await Post.find()
+            .skip((currentPage - 1) * perPage)
+            .limit(perPage)
+            .populate('creator', 'name')
+        // Skips data before the page we're on
+        // Limit the data for JUST the page (2 items per page, for example)
+        res.status(200).json({
+            message: 'Fetched posts successfully.',
+            posts: posts,
+            totalItems: totalItems,
         })
-        .then((posts) => {
-            res.status(200).json({
-                message: 'Fetched posts successfully.',
-                posts: posts,
-                totalItems: totalItems,
-            })
-        })
-        .catch((err) => {
-            if (!err.statusCode) {
-                err.statusCode = 500
-            }
-            next(err)
-        })
+    } catch (err) {
+        if (!err.statusCode) {
+            err.statusCode = 500
+        }
+        next(err)
+    }
 }
 
 exports.createPost = (req, res, next) => {
