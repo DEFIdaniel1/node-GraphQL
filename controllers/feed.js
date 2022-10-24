@@ -1,13 +1,14 @@
 const { validationResult } = require('express-validator')
 const fs = require('fs')
 const path = require('path')
+const post = require('../models/post')
 
 const Post = require('../models/post')
 const User = require('../models/user')
 
 exports.getPosts = (req, res, next) => {
     const currentPage = req.query.page || 1
-    const perPage = req.query.perPage || 1
+    const perPage = 2
     let totalItems
     Post.find()
         .countDocuments()
@@ -132,6 +133,12 @@ exports.editPost = (req, res, next) => {
                 error.statusCode = 404
                 throw error
             }
+            // Check user = post creator
+            if (post.creator.toString() !== req.userId) {
+                const error = new Error('Not authorized: not post author.')
+                error.statusCode = 403
+                throw error
+            }
             //delete old image file if changed
             if (imageUrl !== post.imageUrl) {
                 deleteImage(post.imageUrl)
@@ -161,10 +168,23 @@ exports.deletePost = (req, res, next) => {
                 error.statusCode = 404
                 throw error
             }
+            // Check user = post creator
+            if (post.creator.toString() !== req.userId) {
+                const error = new Error('Not authorized: not post author.')
+                error.statusCode = 403
+                throw error
+            }
             deleteImage(post.imageUrl)
             return Post.findByIdAndDelete(postId)
         })
         .then((response) => {
+            return User.findById(req.userId)
+        })
+        .then((user) => {
+            user.posts.pull(postId)
+            return user.save()
+        })
+        .then((result) => {
             res.status(200).json({ message: 'Post deleted' })
         })
         .catch((err) => {
