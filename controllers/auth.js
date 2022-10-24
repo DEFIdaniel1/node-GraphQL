@@ -1,6 +1,9 @@
 const { validationResult } = require('express-validator')
 const bcrypt = require('bcryptjs')
+const jwt = require('jsonwebtoken')
 const User = require('../models/user')
+require('dotenv').config()
+const jwtSecret = process.env.JTW_SECRET
 
 exports.signup = (req, res, next) => {
     const errors = validationResult(req)
@@ -62,6 +65,18 @@ exports.login = (req, res, next) => {
                 error.statusCode = 401
                 throw error
             }
+            const token = jwt.sign(
+                {
+                    email: loadedUser.email,
+                    userId: loadedUser._id.toString(),
+                },
+                `${jwtSecret}`,
+                { expiresIn: '1h' }
+            )
+            res.status(200).json({
+                token: token,
+                userId: loadedUser._id.toString(),
+            })
         })
         .catch((err) => {
             if (!err.statusCode) {
