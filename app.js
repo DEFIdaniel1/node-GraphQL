@@ -48,11 +48,14 @@ app.use((req, res, next) => {
 //IMAGES - middleware to deal static images folder
 app.use('/images', express.static(path.join(__dirname, 'images')))
 
-// ROUTES
-const feedRoutes = require('./routes/feed')
-const authRoutes = require('./routes/auth')
-app.use('/feed', feedRoutes)
-app.use('/auth', authRoutes)
+// GraphQL
+const { graphqlHTTP } = require('express-graphql')
+const graphqlSchema = require('./graphql/schema')
+const graphqlResolver = require('./graphql/resolvers')
+app.use(
+    '/graphql',
+    graphqlHTTP({ schema: graphqlSchema, rootValue: graphqlResolver })
+)
 
 // Error handling
 app.use((error, req, res, next) => {
@@ -68,11 +71,6 @@ mongoose
         `mongodb+srv://dpisterzi:${mongoDbPassword}@cluster0.wdwpbii.mongodb.net/messages?retryWrites=true&w=majority`
     )
     .then((result) => {
-        console.log('Connected to DB')
-        const server = app.listen(8080)
-        const io = require('./socket').init(server)
-        io.on('connection', (socket) => {
-            console.log('Client connected')
-        })
+        app.listen(4040)
     })
     .catch((err) => console.log(err))
