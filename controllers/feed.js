@@ -15,6 +15,7 @@ exports.getPosts = async (req, res, next) => {
             .skip((currentPage - 1) * perPage)
             .limit(perPage)
             .populate('creator', 'name')
+            .sort({ createdAt: -1 })
         // Skips data before the page we're on
         // Limit the data for JUST the page (2 items per page, for example)
         res.status(200).json({
@@ -96,7 +97,7 @@ exports.getSinglePost = (req, res, next) => {
         })
 }
 
-exports.editPost = (req, res, next) => {
+exports.editPost = async (req, res, next) => {
     const postId = req.params.postId
     const title = req.body.title
     const content = req.body.content
@@ -121,37 +122,35 @@ exports.editPost = (req, res, next) => {
         throw error
     }
     //Find and update post in database
-    Post.findById(postId)
-        .then((post) => {
-            if (!post) {
-                const error = new Error('Could not find post.')
-                error.statusCode = 404
-                throw error
-            }
-            // Check user = post creator
-            if (post.creator.toString() !== req.userId) {
-                const error = new Error('Not authorized: not post author.')
-                error.statusCode = 403
-                throw error
-            }
-            //delete old image file if changed
-            if (imageUrl !== post.imageUrl) {
-                deleteImage(post.imageUrl)
-            }
-            post.title = title
-            post.imageUrl = imageUrl
-            post.content = content
-            return post.save()
-        })
-        .then((result) => {
-            res.status(200).json({ message: 'Post updated!', post: result })
-        })
-        .catch((err) => {
-            if (!err.statusCode) {
-                err.statusCode = 500
-            }
-            next(err)
-        })
+    try {
+        const post = await Post.findById(postId).populate('creator')
+        if (!post) {
+            const error = new Error('Could not find post.')
+            error.statusCode = 404
+            throw error
+        }
+        // Check user = post creator
+        if (post.creator._id.toString() !== req.userId) {
+            const error = new Error('Not authorized: not post author.')
+            error.statusCode = 403
+            throw error
+        }
+        //delete old image file if changed
+        if (imageUrl !== post.imageUrl) {
+            deleteImage(post.imageUrl)
+        }
+        post.title = title
+        post.imageUrl = imageUrl
+        post.content = content
+        await post.save()
+        io.getIO().emit('posts', { action: 'update', post: post })
+        res.status(200).json({ message: 'Post updated!', post: post })
+    } catch (err) {
+        if (!err.statusCode) {
+            err.statusCode = 500
+        }
+        next(err)
+    }
 }
 
 exports.deletePost = (req, res, next) => {
