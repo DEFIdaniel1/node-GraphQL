@@ -4,6 +4,7 @@ const path = require('path')
 
 const Post = require('../models/post')
 const User = require('../models/user')
+const io = require('../socket')
 
 exports.getPosts = async (req, res, next) => {
     const currentPage = req.query.page || 1
@@ -29,7 +30,7 @@ exports.getPosts = async (req, res, next) => {
     }
 }
 
-exports.createPost = (req, res, next) => {
+exports.createPost = async (req, res, next) => {
     const errors = validationResult(req)
     if (!errors.isEmpty()) {
         const error = new Error('Validation failed, entered data is incorrect.')
@@ -50,26 +51,30 @@ exports.createPost = (req, res, next) => {
         imageUrl: imageUrl,
         creator: req.userId,
     })
-    post.save()
-        .then((result) => {
-            return User.findById(req.userId)
+    try {
+        await post.save()
+        const user = await User.findById(req.userId)
+        user.posts.push(post)
+        await user.save()
+        // push post to other users
+        //sending full post DB doc, and adding creator field so it can display as need on the FE
+        io.getIO().emit('posts', {
+            action: 'create',
+            post: {
+                ...post._doc,
+                creator: { _id: req.userId, name: user.name },
+            },
         })
-        .then((user) => {
-            user.posts.push(post)
-            return user.save()
+        res.status(201).json({
+            message: 'Post created successfully!',
+            post: post,
         })
-        .then((result) => {
-            res.status(201).json({
-                message: 'Post created successfully!',
-                post: post,
-            })
-        })
-        .catch((err) => {
-            if (!err.statusCode) {
-                err.statusCode = 500
-            }
-            next(err)
-        })
+    } catch (err) {
+        if (!err.statusCode) {
+            err.statusCode = 500
+        }
+        next(err)
+    }
 }
 
 exports.getSinglePost = (req, res, next) => {
