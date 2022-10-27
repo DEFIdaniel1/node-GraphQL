@@ -54,7 +54,11 @@ const graphqlSchema = require('./graphql/schema')
 const graphqlResolver = require('./graphql/resolvers')
 app.use(
     '/graphql',
-    graphqlHTTP({ schema: graphqlSchema, rootValue: graphqlResolver })
+    graphqlHTTP({
+        schema: graphqlSchema,
+        rootValue: graphqlResolver,
+        graphiql: true,
+    })
 )
 
 // Error handling
