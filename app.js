@@ -58,6 +58,11 @@ app.use(
         schema: graphqlSchema,
         rootValue: graphqlResolver,
         graphiql: true,
+        customFormatErrorFn: (error) => ({
+            message: error.message || 'An error occured',
+            statusCode: error.originalError.statusCode,
+            data: error.originalError.data,
+        }),
     })
 )
 
