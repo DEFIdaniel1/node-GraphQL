@@ -7,7 +7,11 @@ const User = require('../models/user')
 const Post = require('../models/post')
 
 module.exports = {
-    // Input fields on front-end (email, name password) to create a new user
+    /* 
+        Input fields on front-end userInput{email, name, password} to create a new user
+        Saves new user to database
+        Returns new user data with _id added
+    */
     createUser: async function ({ userInput }, req) {
         const { email, name, password } = userInput
         //Validation checks for email and password min length
@@ -46,10 +50,13 @@ module.exports = {
         return { ...createdUser._doc, _id: createdUser._id.toString() }
     },
 
-    // Login function. Inputs are email and password.
+    /* 
+        Input fields on front-end: email, password
+        Validates credentials
+        Returns JWT, userId 
+    */
     login: async function ({ email, password }, req) {
         const user = await User.findOne({ email: email })
-
         // Validate user exists
         if (!user) {
             const error = new Error('User not found.')
@@ -74,9 +81,20 @@ module.exports = {
         return { token: token, userId: user._id.toString() }
     },
 
+    /* 
+        Input fields on front-end: postInput{title, content, imageUrl}
+        Saves new post to database
+        Returns document data and adds _id, createdAt, updatedAt 
+    */
     createPost: async function ({ postInput }, req) {
+        // Check JWT authentication
+        if (!req.isAuth) {
+            const error = new Error('Not authenticated.')
+            error.code = 401
+            throw error
+        }
+        // Validate input data
         const { title, content, imageUrl } = postInput
-        //Validation
         const errors = []
         if (
             validator.isEmpty(title) ||
@@ -102,15 +120,22 @@ module.exports = {
             error.statusCode = 422
             throw error
         }
-
+        // Check user database
+        const user = await User.findById(req.userId)
+        if (!user) {
+            const error = new Error('Invalid user.')
+            error.code = 401
+            throw error
+        }
         // Save post to database
         const post = new Post({
             title: title,
             content: content,
             imageUrl: imageUrl,
+            creator: user,
         })
         const createdPost = await post.save()
-        // Return post with additional mongodb data (id, createdAt, updatedAt)
+        user.posts.push(createdPost)
         return {
             ...createdPost._doc,
             _id: createdPost._id.toString(),

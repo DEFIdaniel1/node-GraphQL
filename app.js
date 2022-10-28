@@ -1,11 +1,16 @@
 const path = require('path')
 require('dotenv').config()
-const mongoDbPassword = process.env.MONGO_DB_PASSWORD
 
 const express = require('express')
 const bodyParser = require('body-parser')
 const mongoose = require('mongoose')
 const multer = require('multer')
+
+const { graphqlHTTP } = require('express-graphql')
+const graphqlSchema = require('./graphql/schema')
+const graphqlResolver = require('./graphql/resolvers')
+const mongoDbPassword = process.env.MONGO_DB_PASSWORD
+const auth = require('./middleware/auth')
 
 const app = express()
 
@@ -51,10 +56,10 @@ app.use((req, res, next) => {
 //IMAGES - middleware to deal static images folder
 app.use('/images', express.static(path.join(__dirname, 'images')))
 
+// Authentication check
+app.use(auth)
+
 // GraphQL
-const { graphqlHTTP } = require('express-graphql')
-const graphqlSchema = require('./graphql/schema')
-const graphqlResolver = require('./graphql/resolvers')
 app.use(
     '/graphql',
     graphqlHTTP({
