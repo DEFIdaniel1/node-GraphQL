@@ -63,7 +63,7 @@ app.use(
         graphiql: true,
         customFormatErrorFn: (error) => ({
             message: error.message || 'An error occured',
-            code: error.statusCode || 500,
+            statusCode: error.statusCode || 500,
             data: error.data,
         }),
     })

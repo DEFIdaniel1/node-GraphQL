@@ -1,10 +1,10 @@
 const bcrypt = require('bcryptjs')
 const validator = require('validator')
 const jwt = require('jsonwebtoken')
-require('dotenv').config()
 
-const jwtPassword = process.env.JWT_PASSWORD
+const jwtPassword = process.env.JWT_PASSWORD //TO DO: resolve using passport
 const User = require('../models/user')
+const Post = require('../models/post')
 
 module.exports = {
     // Input fields on front-end (email, name password) to create a new user
@@ -19,7 +19,7 @@ module.exports = {
             validator.isEmpty(password) ||
             !validator.isLength(password, { min: 5 })
         ) {
-            errors.push({ message: 'Password too short' })
+            errors.push({ message: 'Password is too short' })
         }
         if (errors.length > 0) {
             const error = new Error('Invalid input')
@@ -33,6 +33,7 @@ module.exports = {
             const error = new Error('User already exists')
             throw error
         }
+
         // Hash password for database
         const hashedPw = await bcrypt.hash(password, 12)
         const user = new User({
@@ -44,9 +45,11 @@ module.exports = {
         // Need to overwrite createdUser to a string object for graphql
         return { ...createdUser._doc, _id: createdUser._id.toString() }
     },
+
     // Login function. Inputs are email and password.
-    login: async function ({ email, password }) {
+    login: async function ({ email, password }, req) {
         const user = await User.findOne({ email: email })
+
         // Validate user exists
         if (!user) {
             const error = new Error('User not found.')
@@ -69,5 +72,50 @@ module.exports = {
             { expiresIn: '1h' }
         )
         return { token: token, userId: user._id.toString() }
+    },
+
+    createPost: async function ({ postInput }, req) {
+        const { title, content, imageUrl } = postInput
+        //Validation
+        const errors = []
+        if (
+            validator.isEmpty(title) ||
+            !validator.isLength(title, { min: 5 })
+        ) {
+            errors.push({
+                message: 'Title is invalid: must be >5 characters.',
+            })
+        }
+        if (
+            validator.isEmpty(content) ||
+            !validator.isLength(content, { min: 5 })
+        ) {
+            errors.push({
+                message: 'Content is invalid: must be > 5 characters.',
+            })
+        }
+        if (errors.length > 0) {
+            const error = new Error(
+                'Post cannot be submitted. Invalid field(s).'
+            )
+            error.data = errors
+            error.statusCode = 422
+            throw error
+        }
+
+        // Save post to database
+        const post = new Post({
+            title: title,
+            content: content,
+            imageUrl: imageUrl,
+        })
+        const createdPost = await post.save()
+        // Return post with additional mongodb data (id, createdAt, updatedAt)
+        return {
+            ...createdPost._doc,
+            _id: createdPost._id.toString(),
+            createdAt: createdPost.createdAt.toISOString(),
+            updatedAt: createdPost.updatedAt.toISOString(),
+        }
     },
 }
