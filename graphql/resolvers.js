@@ -144,4 +144,36 @@ module.exports = {
             updatedAt: createdPost.updatedAt.toISOString(),
         }
     },
+
+    /*
+        Function to get all posts for logged in/authenticated users
+        Checks authentication. Outputs post array with pagination and totalPost count
+    */
+    getPosts: async function ({ page }, req) {
+        if (!req.isAuth) {
+            const error = Error('Not authenticated.')
+            error.statusCode = 401
+            throw error
+        }
+        if (!page) {
+            page = 1
+        }
+        const itemsPerPage = 2
+        const totalPosts = await Post.find().countDocuments()
+        const posts = await Post.find()
+            .sort({ createdAt: -1 })
+            .skip((page - 1) * itemsPerPage)
+            .limit(itemsPerPage)
+            .populate('creator')
+        return {
+            posts: posts.map((p) => {
+                return {
+                    ...p._doc,
+                    createdAt: p.createdAt.toISOString(),
+                    updatedAt: p.updatedAt.toISOString(),
+                }
+            }),
+            totalPosts: totalPosts,
+        }
+    },
 }
