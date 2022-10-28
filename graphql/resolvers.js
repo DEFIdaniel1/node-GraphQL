@@ -91,31 +91,7 @@ module.exports = {
         authCheck(req.isAuth)
         // Validate input data
         const { title, content, imageUrl } = postInput
-        const errors = []
-        if (
-            validator.isEmpty(title) ||
-            !validator.isLength(title, { min: 5 })
-        ) {
-            errors.push({
-                message: 'Title is invalid: must be >5 characters.',
-            })
-        }
-        if (
-            validator.isEmpty(content) ||
-            !validator.isLength(content, { min: 5 })
-        ) {
-            errors.push({
-                message: 'Content is invalid: must be > 5 characters.',
-            })
-        }
-        if (errors.length > 0) {
-            const error = new Error(
-                'Post cannot be submitted. Invalid field(s).'
-            )
-            error.data = errors
-            error.statusCode = 422
-            throw error
-        }
+        inputValidationCheck(title, content)
         // Check user database
         const user = await User.findById(req.userId)
         if (!user) {
@@ -145,7 +121,7 @@ module.exports = {
         Function to get all posts for logged in/authenticated users
         Checks authentication. Outputs post array with pagination and totalPost count
     */
-    getPosts: async function ({ page }, req) {
+    posts: async function ({ page }, req) {
         authCheck(req.isAuth)
         if (!page) {
             page = 1
@@ -173,8 +149,8 @@ module.exports = {
         Return a single post based on the postId
         Expect postId as input
     */
-    getPost: async function ({ id }, req) {
-        authCheck(req.isAuth)
+    post: async function ({ id }, req) {
+        // authCheck(req.isAuth)
         const post = await Post.findById(id).populate('creator')
         if (!post) {
             const error = new Error('No post found.')
@@ -187,12 +163,62 @@ module.exports = {
             updatedAt: post.updatedAt.toISOString(),
         }
     },
+
+    updatePost: async function ({ id, postInput }, req) {
+        authCheck(req.isAuth)
+        const { title, content, imageUrl } = postInput
+        const post = await Post.findById(id).populate('creator')
+        if (!post) {
+            const error = new Error('No post found!')
+            error.code = 404
+            throw error
+        }
+        if (post.creator._id.toString() !== req.userId.toString()) {
+            const error = new Error('Not authorized!')
+            error.code = 403
+            throw error
+        }
+        inputValidationCheck(title, content)
+        post.title = title
+        post.content = content
+        if (postInput.imageUrl !== 'undefined') {
+            post.imageUrl = imageUrl
+        }
+        const updatedPost = await post.save()
+        return {
+            ...updatedPost._doc,
+            createdAt: updatedPost.createdAt.toISOString(),
+            updatedAt: updatedPost.updatedAt.toISOString(),
+        }
+    },
 }
 
 function authCheck(isAuth) {
     if (!isAuth) {
         const error = Error('Not authenticated.')
         error.statusCode = 401
+        throw error
+    }
+}
+function inputValidationCheck(title, content) {
+    const errors = []
+    if (validator.isEmpty(title) || !validator.isLength(title, { min: 5 })) {
+        errors.push({
+            message: 'Title is invalid: must be >5 characters.',
+        })
+    }
+    if (
+        validator.isEmpty(content) ||
+        !validator.isLength(content, { min: 5 })
+    ) {
+        errors.push({
+            message: 'Content is invalid: must be > 5 characters.',
+        })
+    }
+    if (errors.length > 0) {
+        const error = new Error('Post cannot be submitted. Invalid field(s).')
+        error.data = errors
+        error.statusCode = 422
         throw error
     }
 }

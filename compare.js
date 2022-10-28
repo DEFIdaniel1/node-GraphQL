@@ -1,5 +1,4 @@
 const path = require('path')
-const fs = require('fs')
 require('dotenv').config()
 
 const express = require('express')
@@ -8,17 +7,14 @@ const mongoose = require('mongoose')
 const multer = require('multer')
 const { graphqlHTTP } = require('express-graphql')
 
+const mongoDbPassword = process.env.MONGO_DB_PASSWORD
 const graphqlSchema = require('./graphql/schema')
 const graphqlResolver = require('./graphql/resolvers')
-const mongoDbPassword = process.env.MONGO_DB_PASSWORD
 const auth = require('./middleware/auth')
 const { clearImage } = require('./util/file')
 
 const app = express()
 
-// Multer & Body Parser Setup
-// Multer adds image uploads to req.file.path
-//TO DO: fix file naming and multer setup
 const fileStorage = multer.diskStorage({
     destination: (req, file, cb) => {
         cb(null, 'images')
@@ -27,6 +23,7 @@ const fileStorage = multer.diskStorage({
         cb(null, new Date().toISOString() + '-' + file.originalname)
     },
 })
+
 const fileFilter = (req, file, cb) => {
     if (
         file.mimetype === 'image/png' ||
@@ -38,14 +35,14 @@ const fileFilter = (req, file, cb) => {
         cb(null, false)
     }
 }
-app.use(bodyParser.json())
+
+// app.use(bodyParser.urlencoded()); // x-www-form-urlencoded <form>
+app.use(bodyParser.json()) // application/json
 app.use(
     multer({ storage: fileStorage, fileFilter: fileFilter }).single('image')
 )
-// Send static image path
 app.use('/images', express.static(path.join(__dirname, 'images')))
 
-//CORS request allowance middleware
 app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader(
@@ -59,10 +56,8 @@ app.use((req, res, next) => {
     next()
 })
 
-// Authentication check
 app.use(auth)
 
-// Uploading & deleting images
 app.put('/post-image', (req, res, next) => {
     if (!req.isAuth) {
         throw new Error('Not authenticated!')
@@ -70,7 +65,6 @@ app.put('/post-image', (req, res, next) => {
     if (!req.file) {
         return res.status(200).json({ message: 'No file provided!' })
     }
-    // Updating images - delete old image in FS
     if (req.body.oldPath) {
         clearImage(req.body.oldPath)
     }
@@ -79,22 +73,24 @@ app.put('/post-image', (req, res, next) => {
         .json({ message: 'File stored.', filePath: req.file.path })
 })
 
-// GraphQL
 app.use(
     '/graphql',
     graphqlHTTP({
         schema: graphqlSchema,
         rootValue: graphqlResolver,
         graphiql: true,
-        customFormatErrorFn: (error) => ({
-            message: error.message || 'An error occurred',
-            statusCode: error.statusCode || 500,
-            data: error.data,
-        }),
+        customFormatErrorFn(err) {
+            if (!err.originalError) {
+                return err
+            }
+            const data = err.originalError.data
+            const message = err.message || 'An error occurred.'
+            const code = err.originalError.code || 500
+            return { message: message, status: code, data: data }
+        },
     })
 )
 
-// Error handling
 app.use((error, req, res, next) => {
     console.log(error)
     const status = error.statusCode || 500
