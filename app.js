@@ -9,7 +9,7 @@ const multer = require('multer')
 
 const app = express()
 
-// MUTER & Body Parser Setup
+// Multer & Body Parser Setup
 const fileStorage = multer.diskStorage({
     destination: (req, file, cb) => {
         cb(null, 'images')
@@ -63,8 +63,8 @@ app.use(
         graphiql: true,
         customFormatErrorFn: (error) => ({
             message: error.message || 'An error occured',
-            statusCode: error.originalError.statusCode,
-            data: error.originalError.data,
+            code: error.statusCode || 500,
+            data: error.data,
         }),
     })
 )
