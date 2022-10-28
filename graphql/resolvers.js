@@ -10,7 +10,7 @@ module.exports = {
     /* 
         Input fields on front-end userInput{email, name, password} to create a new user
         Saves new user to database
-        Returns new user data with _id added
+        Returns new user data with _id added                       
     */
     createUser: async function ({ userInput }, req) {
         const { email, name, password } = userInput
@@ -88,11 +88,7 @@ module.exports = {
     */
     createPost: async function ({ postInput }, req) {
         // Check JWT authentication
-        if (!req.isAuth) {
-            const error = new Error('Not authenticated.')
-            error.code = 401
-            throw error
-        }
+        authCheck(req.isAuth)
         // Validate input data
         const { title, content, imageUrl } = postInput
         const errors = []
@@ -150,11 +146,7 @@ module.exports = {
         Checks authentication. Outputs post array with pagination and totalPost count
     */
     getPosts: async function ({ page }, req) {
-        if (!req.isAuth) {
-            const error = Error('Not authenticated.')
-            error.statusCode = 401
-            throw error
-        }
+        authCheck(req.isAuth)
         if (!page) {
             page = 1
         }
@@ -176,4 +168,31 @@ module.exports = {
             totalPosts: totalPosts,
         }
     },
+
+    /*
+        Return a single post based on the postId
+        Expect postId as input
+    */
+    getPost: async function ({ id }, req) {
+        authCheck(req.isAuth)
+        const post = await Post.findById(id).populate('creator')
+        if (!post) {
+            const error = new Error('No post found.')
+            error.statusCode = 404
+            throw error
+        }
+        return {
+            ...post._doc,
+            createdAt: post.createdAt.toISOString(),
+            updatedAt: post.updatedAt.toISOString(),
+        }
+    },
+}
+
+function authCheck(isAuth) {
+    if (!isAuth) {
+        const error = Error('Not authenticated.')
+        error.statusCode = 401
+        throw error
+    }
 }

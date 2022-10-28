@@ -41,6 +41,8 @@ app.use(bodyParser.json())
 app.use(
     multer({ storage: fileStorage, fileFilter: fileFilter }).single('image')
 )
+// Send static image path
+app.use('/images', express.static(path.join(__dirname, 'images')))
 
 //CORS request allowance middleware
 app.use((req, res, next) => {
