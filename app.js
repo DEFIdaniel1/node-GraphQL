@@ -18,7 +18,6 @@ const app = express()
 
 // Multer & Body Parser Setup
 // Multer adds image uploads to req.file.path
-//TO DO: fix file naming and multer setup
 const fileStorage = multer.diskStorage({
     destination: (req, file, cb) => {
         cb(null, 'images')

@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken')
 const jwtPassword = process.env.JWT_PASSWORD //TO DO: resolve using passport
 const User = require('../models/user')
 const Post = require('../models/post')
+const { clearImage } = require('../util/file')
 
 module.exports = {
     /* 
@@ -15,30 +16,9 @@ module.exports = {
     createUser: async function ({ userInput }, req) {
         const { email, name, password } = userInput
         //Validation checks for email and password min length
-        const errors = []
-        if (!validator.isEmail(email)) {
-            errors.push({ message: 'Email is invalid' })
-        }
-        if (
-            validator.isEmpty(password) ||
-            !validator.isLength(password, { min: 5 })
-        ) {
-            errors.push({ message: 'Password is too short' })
-        }
-        if (errors.length > 0) {
-            const error = new Error('Invalid input')
-            error.data = errors
-            error.statusCode = 422
-            throw error
-        }
-        // Validate user does not exist
-        const existingUser = await User.findOne({ email: email })
-        if (existingUser) {
-            const error = new Error('User already exists')
-            throw error
-        }
-
-        // Hash password for database
+        passwordValidationCheck(password)
+        emailValidationCheck(email)
+        // Hash password for database storage
         const hashedPw = await bcrypt.hash(password, 12)
         const user = new User({
             email: email,
@@ -46,8 +26,7 @@ module.exports = {
             password: hashedPw,
         })
         const createdUser = await user.save()
-        // Need to overwrite createdUser to a string object for graphql
-        return { ...createdUser._doc, _id: createdUser._id.toString() }
+        return { ...createdUser._doc }
     },
 
     /* 
@@ -96,7 +75,7 @@ module.exports = {
         const user = await User.findById(req.userId)
         if (!user) {
             const error = new Error('Invalid user.')
-            error.code = 401
+            error.statusCode = 401
             throw error
         }
         // Save post to database
@@ -164,20 +143,16 @@ module.exports = {
         }
     },
 
+    /* 
+        Function to update post. Input: postId and postInput(title, content, imageUrl) 
+        Returns updated post document
+    */
     updatePost: async function ({ id, postInput }, req) {
         authCheck(req.isAuth)
         const { title, content, imageUrl } = postInput
         const post = await Post.findById(id).populate('creator')
-        if (!post) {
-            const error = new Error('No post found!')
-            error.code = 404
-            throw error
-        }
-        if (post.creator._id.toString() !== req.userId.toString()) {
-            const error = new Error('Not authorized!')
-            error.code = 403
-            throw error
-        }
+        postExistsCheck(post)
+        userIsCreatorCheck(post, req)
         inputValidationCheck(title, content)
         post.title = title
         post.content = content
@@ -191,8 +166,62 @@ module.exports = {
             updatedAt: updatedPost.updatedAt.toISOString(),
         }
     },
+
+    /* 
+        Delete post. Input: postId
+        Removes post from database and returns boolean
+    */
+    deletePost: async function ({ id }, req) {
+        authCheck(req.isAuth)
+        const post = await Post.findById(id)
+        if (!post) {
+            const error = new Error('No post found!')
+            error.statusCode = 404
+            throw error
+        }
+        userIsCreatorCheck(post, req)
+        // Delete image file, post document, and post in user post array
+        clearImage(post.imageUrl)
+        await Post.findByIdAndRemove(id)
+        const user = await User.findById(req.userId)
+        user.posts.pull(id)
+        user.save()
+
+        return true
+    },
+
+    /*
+        Check for user and return user data
+        Password field null for privacy
+    */
+    user: async function ({ id }, req) {
+        authCheck(req.isAuth)
+        const user = await User.findById(id).populate('posts')
+        userExistsCheck(user)
+        return { ...user._doc, password: null }
+    },
+
+    editUser: async function ({ id, editUserData }, req) {
+        const { name, email, status, password } = userInput
+        // authCheck(req.isAuth)
+        const user = await User.findById(id).populate('posts')
+        userExistsCheck(user)
+        // userIsCreatorCheck(user, req)
+        user.name = name
+        user.status = status
+        const validEmail = emailNotUsedCheck(email)
+        if (validEmail) {
+            user.email = email
+        }
+        if (password !== '' || password !== null) {
+            user.password = password
+        }
+        await user.save()
+        return { ...user._doc, password: null }
+    },
 }
 
+// Check authorization of user
 function authCheck(isAuth) {
     if (!isAuth) {
         const error = Error('Not authenticated.')
@@ -200,6 +229,35 @@ function authCheck(isAuth) {
         throw error
     }
 }
+
+// Validate password
+function passwordValidationCheck(password) {
+    if (
+        validator.isEmpty(password) ||
+        !validator.isLength(password, { min: 5 })
+    ) {
+        const error = new Error('Password must be at least 5 characters long.')
+        error.statusCode = 422
+        throw error
+    }
+}
+
+// Validate Email input and ensure it is not in use
+async function emailValidationCheck(email) {
+    if (!validator.isEmail(email)) {
+        const error = new Error('Invalid email.')
+        error.statusCode = 422
+        throw error
+    }
+    const user = await User.findOne({ email: email })
+    if (user) {
+        const error = Error('User already exists.')
+        error.statusCode = 404
+        throw error
+    }
+}
+
+// Ensure title and content inupts meet validation requirements for length and type
 function inputValidationCheck(title, content) {
     const errors = []
     if (validator.isEmpty(title) || !validator.isLength(title, { min: 5 })) {
@@ -219,6 +277,34 @@ function inputValidationCheck(title, content) {
         const error = new Error('Post cannot be submitted. Invalid field(s).')
         error.data = errors
         error.statusCode = 422
+        throw error
+    }
+}
+
+// Ensure post exists
+function postExistsCheck(post) {
+    if (!post) {
+        const error = new Error('No post found!')
+        error.statusCode = 404
+        throw error
+    }
+}
+
+// Ensure user exists
+function userExistsCheck(user) {
+    if (!user) {
+        const error = Error('User not found.')
+        error.statusCode = 404
+        throw error
+    }
+}
+
+// Ensure user is the correct 'owner' of the changeElement.
+// changeElement is either posts or user for modification
+function userIsCreatorCheck(changeElement, req) {
+    if (changeElement.creator._id.toString() !== req.userId.toString()) {
+        const error = new Error('Not authorized!')
+        error.statusCode = 403
         throw error
     }
 }
