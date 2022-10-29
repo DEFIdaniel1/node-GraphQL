@@ -1,6 +1,4 @@
 const path = require('path')
-const fs = require('fs')
-require('dotenv').config()
 
 const express = require('express')
 const bodyParser = require('body-parser')
@@ -10,7 +8,7 @@ const { graphqlHTTP } = require('express-graphql')
 
 const graphqlSchema = require('./graphql/schema')
 const graphqlResolver = require('./graphql/resolvers')
-const mongoDbPassword = process.env.MONGO_DB_PASSWORD
+const { mongoDbPassword, mongoUser, port } = require('./config')
 const auth = require('./middleware/auth')
 const { clearImage } = require('./util/file')
 
@@ -104,9 +102,9 @@ app.use((error, req, res, next) => {
 
 mongoose
     .connect(
-        `mongodb+srv://dpisterzi:${mongoDbPassword}@cluster0.wdwpbii.mongodb.net/messages?retryWrites=true&w=majority`
+        `mongodb+srv://${mongoUser}:${mongoDbPassword}@cluster0.wdwpbii.mongodb.net/messages?retryWrites=true&w=majority`
     )
     .then((result) => {
-        app.listen(4040)
+        app.listen(port || 4040)
     })
     .catch((err) => console.log(err))

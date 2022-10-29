@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken')
+const { jwtSecret } = require('../config')
 
 module.exports = (req, res, next) => {
     /* 
@@ -14,10 +15,7 @@ module.exports = (req, res, next) => {
     const token = authHeader.split(' ')[1]
     let decodedToken
     try {
-        decodedToken = jwt.verify(
-            token,
-            'lkjasdlkfjsntakljsdfamzxclfalksjdflkasdfklj'
-        )
+        decodedToken = jwt.verify(token, `${jwtSecret}`)
     } catch (err) {
         req.isAuth = false
         return next()

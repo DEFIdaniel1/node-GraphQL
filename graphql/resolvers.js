@@ -2,7 +2,7 @@ const bcrypt = require('bcryptjs')
 const validator = require('validator')
 const jwt = require('jsonwebtoken')
 
-const jwtPassword = process.env.JWT_PASSWORD //TO DO: resolve using passport
+const { jwtSecret } = require('../config')
 const User = require('../models/user')
 const Post = require('../models/post')
 const { clearImage } = require('../util/file')
@@ -54,7 +54,7 @@ module.exports = {
                 userId: user._id.toString(),
                 email: user.email,
             },
-            'lkjasdlkfjsntakljsdfamzxclfalksjdflkasdfklj',
+            `${jwtSecret}`,
             { expiresIn: '1h' }
         )
         return { token: token, userId: user._id.toString() }
