@@ -90,7 +90,6 @@ module.exports = {
         await user.save()
         return {
             ...createdPost._doc,
-            _id: createdPost._id.toString(),
             createdAt: createdPost.createdAt.toISOString(),
             updatedAt: createdPost.updatedAt.toISOString(),
         }
@@ -194,27 +193,42 @@ module.exports = {
         Check for user and return user data
         Password field null for privacy
     */
-    user: async function ({ id }, req) {
+    user: async function (args, req) {
+        const id = req.userId
         authCheck(req.isAuth)
         const user = await User.findById(id).populate('posts')
         userExistsCheck(user)
         return { ...user._doc, password: null }
     },
 
-    editUser: async function ({ id, editUserData }, req) {
-        const { name, email, status, password } = userInput
-        // authCheck(req.isAuth)
+    /*
+        Ability to edit user data with validation checks on data types
+        editUserData: name, email, password, status (all nullable)
+        Saves to database, outputs saved user with null password
+    */
+    editUser: async function (editUserData, req) {
+        const id = req.userId
+        authCheck(req.isAuth)
+        const { name, status, email, password } = editUserData.userInput
         const user = await User.findById(id).populate('posts')
         userExistsCheck(user)
-        // userIsCreatorCheck(user, req)
-        user.name = name
-        user.status = status
-        const validEmail = emailNotUsedCheck(email)
-        if (validEmail) {
-            user.email = email
+        if (name) {
+            user.name = name
         }
-        if (password !== '' || password !== null) {
-            user.password = password
+        if (status) {
+            user.status = status
+        }
+        if (email) {
+            const validEmail = emailNotUsedCheck(email)
+            if (validEmail) {
+                user.email = email
+            }
+        }
+        if (password) {
+            const validPassword = passwordValidationCheck(password)
+            if (validPassword) {
+                user.password = password
+            }
         }
         await user.save()
         return { ...user._doc, password: null }
@@ -240,6 +254,7 @@ function passwordValidationCheck(password) {
         error.statusCode = 422
         throw error
     }
+    return true
 }
 
 // Validate Email input and ensure it is not in use
@@ -255,6 +270,7 @@ async function emailValidationCheck(email) {
         error.statusCode = 404
         throw error
     }
+    return true
 }
 
 // Ensure title and content inupts meet validation requirements for length and type
@@ -279,6 +295,7 @@ function inputValidationCheck(title, content) {
         error.statusCode = 422
         throw error
     }
+    return true
 }
 
 // Ensure post exists
@@ -297,6 +314,7 @@ function userExistsCheck(user) {
         error.statusCode = 404
         throw error
     }
+    return true
 }
 
 // Ensure user is the correct 'owner' of the changeElement.
@@ -307,4 +325,5 @@ function userIsCreatorCheck(changeElement, req) {
         error.statusCode = 403
         throw error
     }
+    return true
 }
